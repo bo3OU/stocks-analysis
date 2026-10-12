@@ -1,0 +1,50 @@
+:root {
+  --bg: #fbf9f3;
+  --ink: #1a1a1a;
+  --muted: #6b6b6b;
+  --line: #e4ded0;
+  --bad: #b91c1c;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); }
+main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+
+.search { display: flex; gap: 8px; }
+.search input {
+  flex: 1; max-width: 320px; font: inherit; font-size: 16px; padding: 8px 12px;
+  border: 1px solid var(--ink); border-radius: 6px; background: #fff; text-transform: uppercase;
+}
+.search button, .chip {
+  font: inherit; cursor: pointer; border-radius: 6px;
+}
+.search button { padding: 8px 16px; background: var(--ink); color: #fff; border: 1px solid var(--ink); }
+.search button:disabled { opacity: 0.6; }
+
+.company h1 { margin: 24px 0 4px; font-size: 24px; }
+.muted { color: var(--muted); font-weight: normal; }
+.small { font-size: 13px; margin: 0; }
+.error { color: var(--bad); }
+.hint { margin-top: 24px; }
+
+.lanes { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 8px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 13px;
+  border: 1px solid var(--line); background: transparent; color: var(--muted);
+}
+.chip.on { border-color: var(--ink); color: var(--ink); background: #fff; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+
+.chart { height: 420px; width: 100%; }
+
+.day h2 { font-size: 16px; display: flex; gap: 12px; align-items: baseline; margin-top: 24px; }
+.day ul { list-style: none; padding: 0; margin: 0; }
+.day li {
+  display: flex; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px;
+}
+.day .date { font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
+.day a { color: var(--ink); font-weight: 600; min-width: 72px; flex: none; }
+.link { font: inherit; font-size: 13px; background: none; border: none; color: var(--muted); text-decoration: underline; cursor: pointer; }
