@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { fetchFilings, fetchPrices, type Category, type Filing, type FilingsResponse, type Freshness, type PricesResponse } from "./api";
-import { CATEGORIES, colorOf, EIGHT_K_ITEMS } from "./categories";
-import PriceChart, { type ChartMarker } from "./PriceChart";
+import { fetchFilings, fetchPrices, type FilingsResponse, type Freshness, type PricesResponse } from "./api";
+import { colorOf, describe } from "./categories";
+import Timeline, { type Placed } from "./Timeline";
 
 type Loaded = { prices: PricesResponse; filings: FilingsResponse };
 
@@ -24,21 +24,12 @@ function age(f: Freshness) {
   return `${when} · ${days === 0 ? "today" : `${days} day${days === 1 ? "" : "s"} old`} · ${f.source}`;
 }
 
-function describe(f: Filing) {
-  const items = f.items.map((i) => EIGHT_K_ITEMS[i]).filter(Boolean);
-  if (items.length) return items.join(", ");
-  return f.description && f.description !== f.form ? f.description : "";
-}
-
 export default function App() {
   const [input, setInput] = useState("");
   const [data, setData] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
-  const [enabled, setEnabled] = useState<Set<Category>>(
-    () => new Set(CATEGORIES.filter((c) => c.defaultOn).map((c) => c.id)),
-  );
 
   async function load(e: FormEvent) {
     e.preventDefault();
@@ -58,7 +49,7 @@ export default function App() {
   }
 
   // Each filing placed on the trading day it lands on; filings before the chart starts are left out.
-  const placed = useMemo(() => {
+  const placed: Placed[] = useMemo(() => {
     if (!data) return [];
     const dates = data.prices.bars.map((b) => b.date);
     const first = dates[0];
@@ -67,34 +58,14 @@ export default function App() {
       .map((f) => ({ filing: f, day: snapToTradingDay(dates, f.filed) ?? dates[dates.length - 1] }));
   }, [data]);
 
-  const visible = placed.filter((p) => enabled.has(p.filing.category));
-
-  const markers: ChartMarker[] = useMemo(() => {
-    const seen = new Set<string>();
-    const out: ChartMarker[] = [];
-    for (const { filing, day } of visible) {
-      const key = `${day}:${filing.category}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push({ date: day, color: colorOf(filing.category) });
-    }
-    return out;
-  }, [visible]);
-
-  const counts = useMemo(() => {
-    const m = new Map<Category, number>();
-    for (const { filing } of placed) m.set(filing.category, (m.get(filing.category) ?? 0) + 1);
-    return m;
-  }, [placed]);
-
-  const panel = selected ? visible.filter((p) => p.day === selected) : visible.slice(0, 25);
+  const panel = selected ? placed.filter((p) => p.day === selected) : placed.slice(0, 25);
 
   // Clicks rarely land exactly on a dot, so pick the closest day with a visible filing within three weeks.
   function selectNear(day: string) {
     const target = Date.parse(day);
     let best: string | null = null;
     let bestGap = 21 * 86_400_000;
-    for (const p of visible) {
+    for (const p of placed) {
       const gap = Math.abs(Date.parse(p.day) - target);
       if (gap <= bestGap) {
         best = p.day;
@@ -102,15 +73,6 @@ export default function App() {
       }
     }
     setSelected(best ?? day);
-  }
-
-  function toggle(c: Category) {
-    setEnabled((prev) => {
-      const next = new Set(prev);
-      if (next.has(c)) next.delete(c);
-      else next.add(c);
-      return next;
-    });
   }
 
   return (
@@ -141,21 +103,7 @@ export default function App() {
             </p>
           </header>
 
-          <div className="lanes">
-            {CATEGORIES.filter((c) => counts.get(c.id)).map((c) => (
-              <button
-                key={c.id}
-                className={enabled.has(c.id) ? "chip on" : "chip"}
-                onClick={() => toggle(c.id)}
-                type="button"
-              >
-                <span className="dot" style={{ background: c.color }} />
-                {c.label} <span className="muted">{counts.get(c.id)}</span>
-              </button>
-            ))}
-          </div>
-
-          <PriceChart bars={data.prices.bars} markers={markers} selected={selected} onSelect={selectNear} />
+          <Timeline bars={data.prices.bars} placed={placed} selected={selected} onSelect={selectNear} />
 
           <section className="day">
             <h2>
@@ -166,7 +114,7 @@ export default function App() {
                 </button>
               )}
             </h2>
-            {panel.length === 0 && <p className="muted">No filings in the selected lanes on this day.</p>}
+            {panel.length === 0 && <p className="muted">No filings near this day.</p>}
             <ul>
               {panel.map(({ filing }) => (
                 <li key={filing.accession}>

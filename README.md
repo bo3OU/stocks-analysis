@@ -7,10 +7,10 @@ Start with [docs/architecture.md](docs/architecture.md) for how the pieces fit.
 
 ## What works today
 
-Type a US ticker and get a 5-year daily price chart with SEC EDGAR filings marked on it.
-Filings are grouped into lanes (10-K/10-Q, 8-K events, insider forms, proxy, 13D/13G,
-offerings) that can be switched on and off. Clicking the chart lists the filings near that
-day, with links to the documents on sec.gov.
+Type a US ticker and get a 5-year daily price chart. Under its time axis, SEC EDGAR filings
+sit in one row per type (10-K/10-Q, 8-K events, insider trades, proxy, 5% holders,
+offerings), lined up with the chart's dates as you zoom and pan. Clicking a dot or the chart
+lists the filings on that day, with links to the documents on sec.gov.
 
 ## Run it
 

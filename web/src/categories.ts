@@ -1,14 +1,14 @@
-import type { Category } from "./api";
+import type { Category, Filing } from "./api";
 
 // Color is used only to tell event types apart; everything else stays black on cream.
-export const CATEGORIES: { id: Category; label: string; color: string; defaultOn: boolean }[] = [
-  { id: "report", label: "10-K / 10-Q", color: "#1a1a1a", defaultOn: true },
-  { id: "event", label: "8-K events", color: "#2563eb", defaultOn: true },
-  { id: "insider", label: "Insider (Form 3/4/5)", color: "#b45309", defaultOn: false },
-  { id: "proxy", label: "Proxy", color: "#7c3aed", defaultOn: false },
-  { id: "ownership", label: "13D / 13G", color: "#0f766e", defaultOn: false },
-  { id: "offering", label: "Offerings", color: "#c2410c", defaultOn: true },
-  { id: "other", label: "Other", color: "#9ca3af", defaultOn: false },
+export const CATEGORIES: { id: Category; label: string; color: string }[] = [
+  { id: "report", label: "10-K / 10-Q", color: "#1a1a1a" },
+  { id: "event", label: "8-K events", color: "#2563eb" },
+  { id: "insider", label: "Insider trades", color: "#b45309" },
+  { id: "proxy", label: "Proxy", color: "#7c3aed" },
+  { id: "ownership", label: "5% holders", color: "#0f766e" },
+  { id: "offering", label: "Offerings", color: "#c2410c" },
+  { id: "other", label: "Other", color: "#9ca3af" },
 ];
 
 export const colorOf = (c: Category) => CATEGORIES.find((x) => x.id === c)!.color;
@@ -32,3 +32,9 @@ export const EIGHT_K_ITEMS: Record<string, string> = {
   "7.01": "Reg FD disclosure",
   "8.01": "Other event",
 };
+
+export function describe(f: Filing) {
+  const items = f.items.map((i) => EIGHT_K_ITEMS[i]).filter(Boolean);
+  if (items.length) return items.join(", ");
+  return f.description && f.description !== f.form ? f.description : "";
+}

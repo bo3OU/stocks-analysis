@@ -17,6 +17,7 @@ CATEGORIES = {
     "4/A": "insider",
     "3": "insider",
     "5": "insider",
+    "144": "insider",
     "DEF 14A": "proxy",
     "DEFA14A": "proxy",
     "SC 13D": "ownership",
