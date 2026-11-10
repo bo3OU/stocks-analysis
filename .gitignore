@@ -1,0 +1,7 @@
+.env
+research/
+.browser-profile/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store

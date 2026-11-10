@@ -1,0 +1,212 @@
+"""Shared helpers: env loading, rate limiting, HTTP with bounded retries, redaction, manifest.
+
+Rules baked in (from the tested skills):
+- SEC requests always carry the declared SEC_USER_AGENT. Never a browser User-Agent.
+- Other hosts get the honest default python-requests User-Agent.
+- Sequential requests only, with a minimum interval per host (well under SEC 10 req/s, Finviz 10 req/5 s).
+- Bounded retries: 429 honours Retry-After; 5xx and connection errors back off; 403/404 are final (never circumvented).
+- The Finviz token is never written to disk (manifest, logs, filenames).
+"""
+from __future__ import annotations
+
+import datetime as dt
+import email.utils
+import fcntl
+import json
+import os
+import re
+import sys
+import time
+from dataclasses import dataclass
+from pathlib import Path
+
+import requests
+
+ROOT = Path(__file__).resolve().parent.parent
+ENV_PATH = ROOT / ".env"
+
+# minimum seconds between requests, per host key
+INTERVALS = {"sec": 0.25, "finviz": 0.6, "finra": 0.4, "treasury": 0.5, "other": 0.5}
+
+
+def load_env(path: Path = ENV_PATH) -> dict:
+    env: dict = {}
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        env[k.strip()] = v.strip().strip('"').strip("'")
+    return env
+
+
+def utcnow_iso() -> str:
+    return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def log(msg: str) -> None:
+    print(msg, file=sys.stderr, flush=True)
+
+
+class Redactor:
+    def __init__(self, secrets: list[str]):
+        self.secrets = [s for s in secrets if s]
+
+    def __call__(self, text: str) -> str:
+        for s in self.secrets:
+            text = text.replace(s, "<redacted>")
+        return re.sub(r"(auth=)[^&\s]+", r"\1<redacted>", text)
+
+
+class Manifest:
+    def __init__(self, ticker: str, redact: Redactor):
+        self.ticker = ticker
+        self.redact = redact
+        self.entries: list[dict] = []
+
+    def add(self, **kw) -> dict:
+        kw["id"] = len(self.entries) + 1
+        if "url" in kw:
+            kw["url"] = self.redact(kw["url"])
+        if "note" in kw:
+            kw["note"] = self.redact(str(kw["note"]))
+        kw.setdefault("retrieved_at", utcnow_iso())
+        self.entries.append(kw)
+        return kw
+
+    def save(self, path: Path, extra: dict | None = None) -> None:
+        data = {"ticker": self.ticker, "generated_at": utcnow_iso(), **(extra or {}), "entries": self.entries}
+        path.write_text(json.dumps(data, indent=1))
+
+
+@dataclass
+class Result:
+    ok: bool
+    status: str  # ok | cached | empty | blocked | not_found | unexpected_content | error
+    code: int | None
+    path: Path | None
+    size: int = 0
+    content_disposition: str | None = None
+
+
+def retry_after_seconds(value: str | None, default: int = 5, cap: int = 120) -> int:
+    """Retry-After may be delta-seconds or an HTTP date."""
+    if not value:
+        return default
+    try:
+        return max(0, min(int(float(value)), cap))
+    except ValueError:
+        try:
+            when = email.utils.parsedate_to_datetime(value)
+            return max(0, min(int((when - dt.datetime.now(when.tzinfo)).total_seconds()), cap))
+        except (TypeError, ValueError):
+            return default
+
+
+SOURCES = {"sec": "sec-edgar", "finviz": "finviz-elite", "finra": "finra", "treasury": "us-treasury", "other": "other"}
+
+
+class Http:
+    def __init__(self, manifest: Manifest, sec_user_agent: str, out_root: Path, force: bool = False):
+        self.manifest = manifest
+        self.session = requests.Session()
+        self.sec_ua = sec_user_agent
+        self.out_root = out_root  # manifest paths are relative to this
+        self.force = force  # ignore cached files
+        self.prev: dict[str, dict] = {}  # previous manifest entries by path, to carry headers over for cached files
+        self._last: dict[str, float] = {}
+
+    def _wait(self, host: str) -> None:
+        """Global (cross-process) minimum gap per host: parallel agents and batch runs share one budget."""
+        gap = INTERVALS.get(host, 0.5)
+        lock_dir = self.out_root / "_cache" / "locks"
+        lock_dir.mkdir(parents=True, exist_ok=True)
+        with open(lock_dir / f"{host}.ts", "a+") as f:
+            fcntl.flock(f, fcntl.LOCK_EX)
+            try:
+                f.seek(0)
+                raw = f.read().strip()
+                last = float(raw) if raw else 0.0
+                delta = time.time() - last
+                if delta < gap:
+                    time.sleep(gap - delta)
+                f.seek(0)
+                f.truncate()
+                f.write(str(time.time()))
+                f.flush()
+            finally:
+                fcntl.flock(f, fcntl.LOCK_UN)
+
+    def get(self, url: str, *, host: str, dest: Path, kind: str, source: str | None = None,
+            immutable: bool = False, max_age_h: float | None = None, expect: str | None = None,
+            meta: dict | None = None, retries: int = 3) -> Result:
+        """Download url to dest. immutable=True: reuse forever if present (accession documents).
+        max_age_h: reuse if younger than this many hours. expect: substring required in Content-Type."""
+        meta = meta or {}
+        source = source or SOURCES.get(host, host)
+
+        def rel(p: Path) -> str:
+            try:
+                return str(p.relative_to(self.out_root))
+            except ValueError:
+                return str(p)
+
+        if dest.exists() and not self.force:
+            age_h = (time.time() - dest.stat().st_mtime) / 3600
+            if immutable or (max_age_h is not None and age_h <= max_age_h):
+                disp = (self.prev.get(rel(dest)) or {}).get("content_disposition")
+                extra = {"content_disposition": disp} if disp else {}
+                self.manifest.add(kind=kind, source=source, url=url, path=rel(dest), status="cached",
+                                  bytes=dest.stat().st_size, **extra, **meta)
+                return Result(True, "cached", None, dest, dest.stat().st_size, disp)
+
+        headers = {}
+        if host == "sec":
+            headers["User-Agent"] = self.sec_ua
+        status, code, note = "error", None, ""
+        for attempt in range(retries):
+            self._wait(host)
+            try:
+                r = self.session.get(url, headers=headers, timeout=90, allow_redirects=True)
+            except requests.RequestException as e:
+                note = type(e).__name__
+                time.sleep(2 * (attempt + 1))
+                continue
+            code = r.status_code
+            if code == 200:
+                ctype = r.headers.get("Content-Type", "").lower()
+                body = r.content
+                if len(body) == 0:
+                    status = "empty"
+                elif expect and expect not in ctype:
+                    status, note = "unexpected_content", f"content-type {ctype!r}"
+                    dest = dest.with_name(dest.name + ".bad")
+                else:
+                    status = "ok"
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                tmp = dest.with_name(dest.name + ".tmp")
+                tmp.write_bytes(body)
+                os.replace(tmp, dest)
+                disp = r.headers.get("Content-Disposition")
+                extra = {"content_disposition": disp} if disp else {}
+                self.manifest.add(kind=kind, source=source, url=url, path=rel(dest), status=status, http=code,
+                                  bytes=len(body), note=note, **extra, **meta)
+                return Result(status == "ok", status, code, dest, len(body), disp)
+            if code == 429:
+                wait = retry_after_seconds(r.headers.get("Retry-After")) + 1
+                note = f"429 retry-after {wait - 1}s"
+                time.sleep(wait)
+                continue
+            if code >= 500:
+                note = f"HTTP {code}"
+                time.sleep(2 * (attempt + 1))
+                continue
+            if code == 403:
+                status = "blocked"
+            elif code == 404:
+                status = "not_found"
+            else:
+                status = "error"
+            break
+        self.manifest.add(kind=kind, source=source, url=url, path=None, status=status, http=code, note=note, **meta)
+        return Result(False, status, code, None)

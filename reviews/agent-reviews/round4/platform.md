@@ -1,0 +1,16 @@
+## Round 4 findings
+
+1. **P4-01 — MEDIUM — [ORCHESTRATION.md:10](/private/tmp/claude-501/-Users-ali/d4c86359-2e4c-4fbd-8343-299aea24f480/scratchpad/consult2/agents/ORCHESTRATION.md:10).** Positioning runs alongside filings, although it summarizes the filings reader’s insider and holder review; valuation also lacks an explicit positioning handoff. This can duplicate checks or leave the dated price basis out of valuation. **Fix:** run positioning after filings and pass its findings to valuation. Spec §§4, 5F.
+
+2. **P4-02 — MEDIUM — [ORCHESTRATION.md:17](/private/tmp/claude-501/-Users-ali/d4c86359-2e4c-4fbd-8343-299aea24f480/scratchpad/consult2/agents/ORCHESTRATION.md:17).** The run order assigns no lead for several material specialist modules, including public bond trades, awards, imports and hiring. **Fix:** assign relevant modules in `FOCUS` and record inaccessible ones as gaps. Spec §6.
+
+3. **P4-03 — MEDIUM — [CONTRACT.md:3](/private/tmp/claude-501/-Users-ali/d4c86359-2e4c-4fbd-8343-299aea24f480/scratchpad/consult2/agents/CONTRACT.md:3).** The conflict rule does not resolve the filing reader’s stale instruction at line 22 to report a 10-Q/10-K-only conflict. [RULEBOOK_FILINGS.md:12](/private/tmp/claude-501/-Users-ali/d4c86359-2e4c-4fbd-8343-299aea24f480/scratchpad/consult2/agents/RULEBOOK_FILINGS.md:12) already includes results-bearing 20-F/6-K, consistent with the [SEC final rule](https://www.sec.gov/files/rules/final/2022/33-11138.pdf). **Fix:** make the current shared rulebook prevail over stale agent steps and report only unresolved conflicts. Spec §§1, 5F.
+
+4. **P4-04 — MEDIUM — [CONTRACT.md:25](/private/tmp/claude-501/-Users-ali/d4c86359-2e4c-4fbd-8343-299aea24f480/scratchpad/consult2/agents/CONTRACT.md:25).** Its SEC fetch example gives `--out` no extension, while [agent_fetch.py:116](/private/tmp/claude-501/-Users-ali/d4c86359-2e4c-4fbd-8343-299aea24f480/scratchpad/consult2/scripts/agent_fetch.py:116) converts text according to that extension. Copying the example with `--text` fails conversion. **Fix:** show a matching `.htm` output and state the supported extensions. Spec §1, source inspection.
+
+The revised versions of all seven files are under [revised/round4](/private/tmp/claude-501/-Users-ali/d4c86359-2e4c-4fbd-8343-299aea24f480/scratchpad/consult2/revised/round4). I changed the [contract](/private/tmp/claude-501/-Users-ali/d4c86359-2e4c-4fbd-8343-299aea24f480/scratchpad/consult2/revised/round4/agents/CONTRACT.md) and [orchestration guide](/private/tmp/claude-501/-Users-ali/d4c86359-2e4c-4fbd-8343-299aea24f480/scratchpad/consult2/revised/round4/agents/ORCHESTRATION.md); the other five reviewed files were copied unchanged. Both revised scripts passed `py_compile`.
+
+**Acceptance checks using SNDK samples:** confirm positioning uses the filing review for the 600-share Form 4 sale at $1,158.26 without inferring motive; reports 4,704,783 shares short at the 2026-10-15 settlement date separately from daily short-sale volume; describes the −13.47% post-earnings close-to-close move without claiming its cause; and treats the blocked 2026-10-30 FINRA fetch as a coverage gap.
+
+COUNTS: HIGH=0 MEDIUM=4 LOW=0  
+CONVERGED: yes

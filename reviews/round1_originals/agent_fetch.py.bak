@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""Guarded single-URL fetch for agents: SEC documents or Finviz Elite exports that fetch_company.py did not pull.
+
+  agent_fetch.py sec    URL                 --out research/<T>/agents/<agent>/work/downloads/<name> [--text] [--max-age-h N]
+  agent_fetch.py finviz "export/stock?t=SNDK&ty=si" --out research/<T>/agents/<agent>/work/downloads/<name>.csv
+
+Guards (so an agent cannot misuse credentials or write into the data it must not edit):
+- sec: https only, hosts www.sec.gov / data.sec.gov / efts.sec.gov; sends the declared SEC User-Agent from .env.
+- finviz: path must start with 'export/' on elite.finviz.com; the token is appended here and never printed or stored;
+  a caller-supplied 'auth=' is rejected.
+- output must be inside research/<TICKER>/agents/<agent>/ (never raw/, text/, derived/ of the fetch script).
+- one global rate budget shared with every other process (cross-process lock in common.py).
+- every call is appended (token redacted) to research/_logs/agent_fetches.jsonl.
+Prints one JSON line: status, http, bytes, path, text_path.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+from urllib.parse import urlparse
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from common import Http, Manifest, Redactor, ROOT, load_env, utcnow_iso  # noqa: E402
+from html_to_text import convert  # noqa: E402
+
+RESEARCH = ROOT / "research"
+SEC_HOSTS = {"www.sec.gov", "data.sec.gov", "efts.sec.gov"}
+OUT_RE = re.compile(r"^research/[^/]+/agents/[^/]+/.+")
+
+
+def fail(msg: str) -> int:
+    print(json.dumps({"status": "refused", "error": msg}))
+    return 2
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("kind", choices=["sec", "finviz"])
+    ap.add_argument("target")
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--text", action="store_true", help="also write a plain-text version (.txt) of html/pdf")
+    ap.add_argument("--max-age-h", type=float, default=None, help="reuse an existing file younger than this (hours)")
+    args = ap.parse_args()
+
+    out = Path(args.out)
+    out = out if out.is_absolute() else Path.cwd() / out
+    out = out.resolve()
+    try:
+        rel = out.relative_to(ROOT).as_posix()
+    except ValueError:
+        return fail(f"output must be inside {ROOT}")
+    if not OUT_RE.match(rel) or ".." in rel:
+        return fail("output must be under research/<TICKER>/agents/<agent>/ (not raw/, text/ or derived/)")
+
+    env = load_env()
+    redact = Redactor([env.get("FINVIZ_AUTH_TOKEN", "")])
+    if args.kind == "sec":
+        u = urlparse(args.target)
+        if u.scheme != "https" or u.hostname not in SEC_HOSTS:
+            return fail(f"sec fetch allows https URLs on {sorted(SEC_HOSTS)} only")
+        url, host = args.target, "sec"
+        immutable = "/Archives/edgar/data/" in u.path and not u.path.endswith("index.json")
+    else:
+        t = args.target.lstrip("/")
+        if not (t.startswith("export/") or t.startswith("export?")) or "auth=" in t.lower() or "://" in t:
+            return fail("finviz target must be a path starting with 'export/' and must not contain auth=")
+        url, host, immutable = f"https://elite.finviz.com/{t}&auth={env['FINVIZ_AUTH_TOKEN']}" if "?" in t else None, "finviz", False
+        if url is None:
+            return fail("finviz target needs a query string, e.g. export/stock?t=SNDK&ty=si")
+
+    man = Manifest("agent", redact)
+    http = Http(man, env["SEC_USER_AGENT"], RESEARCH)
+    res = http.get(url, host=host, dest=out, kind=f"agent_{args.kind}", immutable=immutable, max_age_h=args.max_age_h,
+                   expect="csv" if args.kind == "finviz" else None)
+    text_path = None
+    if args.text and (res.ok or res.status == "cached") and res.path and res.path.suffix.lower() in (".htm", ".html", ".pdf", ".txt"):
+        tp = res.path.with_suffix(res.path.suffix + ".txt") if res.path.suffix.lower() != ".txt" else None
+        if tp:
+            ok, note = convert(res.path, tp, f"# SOURCE: {redact(url)}\n# retrieved {utcnow_iso()}")
+            text_path = str(tp.relative_to(ROOT)) if ok else None
+    result = {"status": res.status, "http": res.code, "bytes": res.size,
+              "path": str(res.path.relative_to(ROOT)) if res.path else None, "text_path": text_path,
+              "content_disposition": res.content_disposition}
+    log = RESEARCH / "_logs" / "agent_fetches.jsonl"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    with log.open("a") as f:
+        f.write(json.dumps({"ts": utcnow_iso(), "kind": args.kind, "url": redact(url), **result}) + "\n")
+    print(json.dumps(result))
+    return 0 if res.ok or res.status == "cached" else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
