@@ -718,6 +718,7 @@ def main() -> int:
     ap.add_argument("--index-years", type=int, default=3, help="years of SEC filing index to load (default 3; also the Form 3/4/5 window)")
     ap.add_argument("--as-of", help="point-in-time cutoff with a time, e.g. '2026-10-29 16:00'; builds a separate folder")
     ap.add_argument("--tz", default=None, help="IANA timezone for an --as-of time without a UTC offset (required then), e.g. America/New_York")
+    ap.add_argument("--instrument", action="store_true", help="ETF or index used as a benchmark: no SEC identity, Finviz price data only")
     ap.add_argument("--si-lag-days", type=int, default=SI_LAG_DAYS, help="assumed FINRA short-interest publication lag in days (as-of only)")
     args = ap.parse_args()
     env = load_env()
@@ -726,6 +727,8 @@ def main() -> int:
             print(f"missing {k} in {ROOT / '.env'}", file=sys.stderr)
             return 2
     steps = [s for s in args.only.split(",") if s in ALL_STEPS]
+    if args.instrument:
+        steps = ["finviz"]
     try:
         ctx = Ctx(args, env)
     except ValueError as e:
@@ -733,7 +736,12 @@ def main() -> int:
         return 2
     errors: list[str] = []
     try:
-        resolve_identity(ctx)
+        if args.instrument:
+            ctx.identity.update(research_folder=ctx.dir.name, mode="live" if ctx.live else "as_of", name=ctx.ticker, instrument="non-SEC instrument (ETF or index): Finviz data only")
+            if not ctx.live:
+                ctx.identity.update(as_of_utc=ctx.asof_utc.strftime("%Y-%m-%dT%H:%M:%SZ"), as_of_input=ctx.args.as_of)
+        else:
+            resolve_identity(ctx)
     except Exception as e:  # noqa: BLE001
         errors.append(f"identity: {e}")
         conceal_shared_cache_paths(ctx)

@@ -1,12 +1,19 @@
 # Orchestration guide (for the stock-deep-dive orchestrator and for the user)
 
-`PROMPT_ORCHESTRATOR.md` governs the report. Pass absolute ROOT (this file's parent directory's parent) in every brief. The orchestrator alone fetches company/peer caches and writes the draft and final report; each agent writes only in `research/<TICKER>/agents/<agent>/`.
+The orchestrator's own system prompt (the `stock-deep-dive` agent, `~/.claude/agents/stock-deep-dive.md`) governs the report; there is no separate prompt file. Pass absolute ROOT (this file's parent directory's parent) in every brief. The orchestrator alone fetches company/peer caches and writes the draft and final report; each agent writes only in `research/<TICKER>/agents/<agent>/`.
+
+## Running it
+- Start the orchestrator as the main session (`claude --agent stock-deep-dive`), not as a subagent of another session; it must stay in control of the phases and be able to write files.
+- Start parallel specialists as several Agent calls in one message, in the foreground, and wait for all of them.
+- Claude Code does not let subagents write report-style files such as `findings.md`. Each agent returns the complete findings text as its final response; the orchestrator saves it with `handoff.py save` and confirms with `handoff.py check` before passing paths downstream. Agents still write `claims.jsonl`, `search_log.md` and `work/` themselves.
+- Headless runs cannot ask for permission: allow `cd`, `cat`, `sed`, `find` and plain commands without shell variables or compound statements, or agents lose time on denials.
 
 ## Run order
 | Phase | Who | Needs |
 |---|---|---|
 | 0 Scope | orchestrator | verify issuer identity (legal name, CIK, exchange symbol, share class/ADR, reporting currency/standard, fiscal year end) with cited evidence; choose relevant peers without padding, 4-7 questions, competing explanations and a source-family plan per question |
 | 1 Fetch | orchestrator runs `ROOT/.venv/bin/python -I ROOT/scripts/fetch_company.py <TICKER> [--as-of "YYYY-MM-DD HH:MM" --tz <zone>]` and each peer at the same instant, sequentially; record each printed `RESEARCH_DIR=<folder>` for briefs and run `ROOT/.venv/bin/python -I ROOT/scripts/folders_match.py <target dir> [<peer dirs>]` (it must print `"ok": true`) (the point-in-time cutoff is applied by the script, not by the agents) | use each normalized cache ticker (dots become hyphens) in briefs and paths; confirm CIK and other identity fields from eligible filings, `INVENTORY.md`, manifest, caps and gaps; fetch missing required records or mark a block before delegation |
+| 1b Prepare | orchestrator | after phase 1 run `ROOT/.venv/bin/python -I ROOT/scripts/prepare_company.py <target dir> [--history-years 5]` (digest, insider ledger and flags, financial tables, positioning metrics; ends with exit code 0 only if all steps ran), then `peer_table.py <target dir> <peer dirs>` when peers exist; also fetch one sector/index ETF benchmark at the same cutoff when it helps (`fetch_company.py XBI --instrument [--as-of ... --tz ...]`) and run `benchmark_compare.py <target dir> <ETF dir>`; a failed step is a gap to state, not a reason to skip the agents. Agents read these files before raw text |
 | 2 Filings | `stock-filings-reader` alone | phase 1 |
 | 3 Research, numbers and positioning, in parallel | `stock-financials-analyst`, `stock-positioning-analyst`, `stock-management-analyst`, `stock-market-analyst`, `stock-geopolitics-analyst`, `stock-competition-analyst` | pass the filings reader's exact current-run findings and claims pair in `PRIOR_FINDINGS` to each, after verifying that run's `AS_OF` and that both files are complete. No agent reads another agent's output opportunistically. If filings is blocked, pass `PRIOR_FINDINGS: filings reader BLOCKED: <reason>`; financials blocks, while the other five work from cache only when `FOCUS` explicitly authorizes that fallback and they state the coverage gap |
 | 4 Valuation | `stock-valuation-analyst` | financials tables/calculation appendix, filings claims, competition peer table or stated gap, and positioning's dated price basis or gap |
@@ -20,7 +27,7 @@ Assign material section 6 modules in `FOCUS`, with reasons for omitting others; 
 
 ## Brief template (send to every agent)
 ```
-TICKER: <e.g. SNDK>
+TICKER: <ticker>
 ROOT: <absolute project root>
 AS_OF: <date and time with timezone, e.g. 2026-11-09 16:00 America/New_York>
 RESEARCH_DIR: <folder printed by fetch_company.py>
@@ -39,6 +46,11 @@ Read `ROOT/agents/<name>.md` and `CONTRACT.md`. Pass competition exact `PEER_DIR
 1. `INVENTORY.md`, then each agent's `findings.md` and relevant `claims.jsonl`.
 2. `agents/stock-reconciler/reconciliation.md` and `.csv` before reporting; retain unresolved mismatches and unverified claims.
 3. `search_log.md` and saved inputs to build the source register, coverage/gaps log, calculations and claim ledger. Cite originals beside material report facts; return new material assertions to the reconciler.
+
+## Script helpers for handoffs
+- At the end collect every agent's `work/PROMOTE.md` into `RESEARCH_DIR/promote_candidates.md` (scripts agents wrote that the shared scripts did not cover) and tell the user, so they can be reviewed and promoted into `scripts/` and `skills/analysis-scripts/SKILL.md`.
+- After each agent returns, `handoff.py save <dir> --agent <name>` stores its returned findings text (stdin), then `handoff.py check <dir> --agent <name> --as-of "<AS_OF>"` must print OK before its output goes downstream.
+- Before phase 6 run `verify_claims.py <dir>` (exit 1 means ERROR rows to fix or disclose); at phase 7 run `handoff.py appendix <dir>` for the source register, claim ledger and gaps.
 
 ## Handling problems
 - On `BLOCKED: ...`, fix the required input and rerun that agent; if unavailable, disclose the limitation.
