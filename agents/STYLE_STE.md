@@ -11,7 +11,7 @@ Use for `brief.md`. It is a style aid. It is not a certified check against the f
 6. Use a numeral for every number. Write the unit and the date. Write "2026-09-30" or "30 Sep 2026". Do not write "last quarter" without a date.
 7. Put one topic in each paragraph. Use no more than 6 sentences in a paragraph.
 8. Do not use idioms, figures of speech or hedging chains. State the limit once: "The data covers 13 to 33 weeks."
-9. Every sentence with a number ends with a claim ID in brackets: `[FIL-041]`. A fact without a claim ID is not allowed. Mark an own calculation as `[CALC: VAL-007]`.
+9. Every sentence with a number ends with a claim ID in brackets: `[FIL-041]`. A fact without a claim ID is not allowed. Mark an own calculation as `[CALC: VAL-007]`. In screen mode (no claims exist) use `[src: tables/financial_summary.md]` or `[src: text/<file>:<line>]` instead.
 10. Say what is unknown. Write "Unknown: <what>. <why>." Do not fill a gap with a guess. Do not give a buy, sell or hold call. Do not give one target price.
 
 ## Structure of `brief.md` (at most 800 words)

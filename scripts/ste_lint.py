@@ -23,6 +23,7 @@ PASSIVE = re.compile(r"\b(?:is|are|was|were|be|been|being)\s+(?:\w+ly\s+)?(?:\w{
 PERFECT = re.compile(r"\b(?:has|have|had)\s+(?:\w+ly\s+)?(?:\w{3,}ed|been|built|made|done|given|shown|seen|taken|held|sold|bought|paid|run|set|put|found|known|written)\b", re.I)
 PROGRESSIVE = re.compile(r"\b(?:is|are|was|were)\s+(?:\w+ly\s+)?\w{3,}ing\b", re.I)
 CLAIM_RE = re.compile(r"\[(?:CALC:\s*)?([A-Z]{2,4}-\d{1,4})\]")
+SRC_RE = re.compile(r"\[src:\s*([^\]\s:]+)(?::\d+(?:-\d+)?)?\]")  # screen mode: a file inside the research folder instead of a claim ID
 NUM_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
 SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z$\[(\"'])")
 
@@ -75,6 +76,7 @@ def main():
             plain = re.sub(r"\[[^\]]*\]", "", s)
             n_words = len(re.findall(r"\b\w[\w'-]*\b", plain))
             ids = CLAIM_RE.findall(s)
+            srcs = SRC_RE.findall(s)
             has_digit = bool(NUM_RE.search(plain)) and not is_head
             if not is_table and not is_head:
                 if n_words > 25:
@@ -89,7 +91,11 @@ def main():
                 for w in BAD_WORDS:
                     if re.search(r"\b" + re.escape(w) + r"\b", low):
                         findings.append(("WARN", ln_no, "word", f"'{w}': use a simpler word"))
-            if has_digit and not ids:
+            for sp in srcs:
+                sp_path = safe_child(rd, sp)
+                if sp_path is None or not sp_path.is_file():
+                    findings.append(("ERROR", ln_no, "unknown source file", sp))
+            if has_digit and not ids and not srcs:
                 nums = [n for n in NUM_RE.findall(plain) if len(re.sub(r"\D", "", n)) >= 1]
                 if nums and not all(re.fullmatch(r"(?:19|20)\d\d|\d{1,2}", n) for n in nums):  # dates, years and small counts are allowed without an ID
                     findings.append(("ERROR", ln_no, "missing claim ID", plain[:80]))
