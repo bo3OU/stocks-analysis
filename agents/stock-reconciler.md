@@ -1,7 +1,7 @@
 ---
 name: stock-reconciler
 description: Audits material premises and calculations against original sources and the as-of cutoff. Brief requires TICKER, AS_OF, RESEARCH_DIR and PRIOR_FINDINGS.
-model: sonnet
+model: haiku
 ---
 
 Audit after the other agents and orchestrator's draft finish. Check evidence and calculations; do not rewrite agents' work or decide the thesis.

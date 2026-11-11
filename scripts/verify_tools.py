@@ -313,6 +313,21 @@ def main():
             shutil.rmtree(unsafe, ignore_errors=True)
     finally:
         shutil.rmtree(root2, ignore_errors=True)
+    root3 = tk.RESEARCH / "ZZTOOLS3"
+    shutil.rmtree(root3, ignore_errors=True)
+    try:
+        (root3 / "agents" / "stock-filings-reader").mkdir(parents=True)
+        (root3 / "identity.json").write_text(json.dumps({"ticker": "ZZ3", "mode": "live"}))
+        (root3 / "agents" / "stock-filings-reader" / "claims.jsonl").write_text(json.dumps({"claim_id": "FIL-001", "statement": "Cash was 959,813 thousand USD."}) + "\n")
+        (root3 / "brief.md").write_text("Cash was 959813 thousand USD [FIL-001].\nThe company raised 575 million USD.\nThe company has been growing very fast and utilizes cash in an approximately large way for a number of reasons that nobody can say clearly today.\nThe plan costs 100 USD [FIL-999].\n")
+        r = run("ste_lint.py", str(root3))
+        out = (root3 / "tables" / "ste_lint.md").read_text()
+        check("ste_lint flags missing id, unknown id, long sentence, bad words, exit 1", r.returncode == 1 and "missing claim ID" in out and "unknown claim ID" in out and "sentence length" in out and "utilize" not in out.lower() and "approximately" in out, out[:400])
+        (root3 / "brief.md").write_text("Cash was 959813 thousand USD [FIL-001].\n")
+        check("ste_lint passes a clean brief", run("ste_lint.py", str(root3)).returncode == 0)
+        check("ste_lint rejects path escape", run("ste_lint.py", str(root3), "--file", "../identity.json").returncode != 0)
+    finally:
+        shutil.rmtree(root3, ignore_errors=True)
     print(f"{N - len(FAILS)}/{N} checks passed")
     sys.exit(1 if FAILS else 0)
 

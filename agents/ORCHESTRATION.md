@@ -47,6 +47,9 @@ Read `ROOT/agents/<name>.md` and `CONTRACT.md`. Pass competition exact `PEER_DIR
 2. `agents/stock-reconciler/reconciliation.md` and `.csv` before reporting; retain unresolved mismatches and unverified claims.
 3. `search_log.md` and saved inputs to build the source register, coverage/gaps log, calculations and claim ledger. Cite originals beside material report facts; return new material assertions to the reconciler.
 
+## Final brief
+- After the report, write `brief.md` in the style of `agents/STYLE_STE.md` (STE style, 800 words at most, a claim ID on every sentence with a number, unknowns stated, nothing that is missing from `report.md`). Run `ste_lint.py <dir>` and fix the ERROR lines once.
+
 ## Script helpers for handoffs
 - After the filings reader and again before phase 6 run `coverage_check.py <dir>`. Every NOT COVERED line (an offering or financing filing, 8-K item 4.01/4.02/5.02/2.04, going-concern or weakness wording, lock-up, insider activity that no claim cites) goes back once to the owning agent as a narrow FOCUS ("add claims only for these items"); anything still uncovered is stated as a gap in the report.
 - Cost: use `scripts/run_deep_dive.sh TICKER "Name, EXCHANGE"` (Sonnet orchestrates phases 0-6, Opus writes only the final report) and read the logs with `cost_ledger.py report research/_logs/<TICKER>_stage*.jsonl`.

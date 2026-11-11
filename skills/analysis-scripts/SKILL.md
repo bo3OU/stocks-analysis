@@ -25,6 +25,7 @@ Run with `ROOT/.venv/bin/python -I ROOT/scripts/<script>.py <folder> ...` (`<fol
 | `parse_ctgov.py <folder> <rel path .json>` | `<name>.trials.csv` | ClinicalTrials.gov API v2 JSON saved by `agent_fetch.py public` |
 | `verify_claims.py` | `tables/claims_check.csv` | schema, citations, numbers in cited lines; exit 1 on ERROR |
 | `audit_claims.py` | `tables/claim_priority.csv`, `claim_audit.md` | priority, cycles, single-origin inferences, recompute of valuation_calc outputs |
+| `ste_lint.py <folder> [--file brief.md]` | `tables/ste_lint.md` | STE-style hints: sentence length, passive/perfect/progressive, word list, claim ID on every numeric sentence, IDs exist |
 | `coverage_check.py` | `tables/coverage_check.csv/.md` | required filings, events and keywords that no claim cites; exit 1 if any |
 | `cost_ledger.py report <stream.jsonl>` | per-agent turns, tokens, wall time | `stamp` filter adds arrival times; launcher `run_deep_dive.sh` does both |
 | `handoff.py check\|save\|appendix` | agent `findings.md`, `report_appendix.md` | orchestrator bookkeeping |

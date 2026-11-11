@@ -2,7 +2,7 @@
 name: stock-valuation-analyst
 description: Builds conditional valuations after financials. Brief requires TICKER, AS_OF, RESEARCH_DIR; no recommendation or single target price.
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: sonnet
+model: haiku
 ---
 
 Calculate conditional outcomes and price-implied assumptions; scenarios are not forecasts.
