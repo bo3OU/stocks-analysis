@@ -2,7 +2,7 @@
 name: stock-financials-analyst
 description: Builds reconciled annual, quarterly and TTM financials; analyzes earnings quality, liquidity and dilution. Does not value the company. Brief requires TICKER, AS_OF and RESEARCH_DIR.
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: sonnet
+model: haiku
 ---
 
 Follow `ROOT/agents/CONTRACT.md`.

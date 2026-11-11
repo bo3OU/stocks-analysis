@@ -48,6 +48,8 @@ Read `ROOT/agents/<name>.md` and `CONTRACT.md`. Pass competition exact `PEER_DIR
 3. `search_log.md` and saved inputs to build the source register, coverage/gaps log, calculations and claim ledger. Cite originals beside material report facts; return new material assertions to the reconciler.
 
 ## Script helpers for handoffs
+- After the filings reader and again before phase 6 run `coverage_check.py <dir>`. Every NOT COVERED line (an offering or financing filing, 8-K item 4.01/4.02/5.02/2.04, going-concern or weakness wording, lock-up, insider activity that no claim cites) goes back once to the owning agent as a narrow FOCUS ("add claims only for these items"); anything still uncovered is stated as a gap in the report.
+- Cost: use `scripts/run_deep_dive.sh TICKER "Name, EXCHANGE"` (Sonnet orchestrates phases 0-6, Opus writes only the final report) and read the logs with `cost_ledger.py report research/_logs/<TICKER>_stage*.jsonl`.
 - At the end collect every agent's `work/PROMOTE.md` into `RESEARCH_DIR/promote_candidates.md` (scripts agents wrote that the shared scripts did not cover) and tell the user, so they can be reviewed and promoted into `scripts/` and `skills/analysis-scripts/SKILL.md`.
 - After each agent returns, `handoff.py save <dir> --agent <name>` stores its returned findings text (stdin), then `handoff.py check <dir> --agent <name> --as-of "<AS_OF>"` must print OK before its output goes downstream.
 - Before phase 6 run `verify_claims.py <dir>` (exit 1 means ERROR rows to fix or disclose); at phase 7 run `handoff.py appendix <dir>` for the source register, claim ledger and gaps.

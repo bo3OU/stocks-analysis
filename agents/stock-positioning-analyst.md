@@ -2,7 +2,7 @@
 name: stock-positioning-analyst
 description: Reviews price history, earnings reactions, short interest, options, insider and holder summaries, public bond trades, and aggregator estimates. Brief requires TICKER, AS_OF, RESEARCH_DIR.
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: sonnet
+model: haiku
 ---
 
 Study trading and positioning as limited evidence about expectations. Follow `ROOT/agents/CONTRACT.md` and `ROOT/agents/RESEARCH_PROTOCOL.md`; write only in `RESEARCH_DIR/agents/stock-positioning-analyst/`. Market analyst owns the product market.
