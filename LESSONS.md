@@ -19,8 +19,8 @@
 - `coverage_check.py` found the missing offering filing and lock-up in the new VKTX run.
 
 ## Modes
-- `scripts/run_screen.sh`: scripts plus one Sonnet call, about 10 minutes, no specialists. Untested end to end.
-- `scripts/run_deep_dive.sh`: two stages on Sonnet, specialists on Haiku, in batches. Untested end to end on the new settings (first test: ZTS).
+- `scripts/run_screen.sh`: scripts plus one Sonnet call, no specialists. Tested on a cached ticker (MU): 3.8 minutes, $0.93, 36 turns, lint 0 errors, 756 words, states what it did not cover. A new ticker adds the fetch (about 2 to 4 minutes).
+- `scripts/run_deep_dive.sh`: two stages on Sonnet, specialists on Haiku, in batches; stage R resumes after a limit. First full run on the new settings (ZTS): about $15.6 total (stage A $3.05 cut by the limit, R $9.42, B $3.15), about 108 minutes active, brief 795 words with 0 lint errors and 0 of 20 coverage items missing, but 191 of 358 claims failed verify_claims (format). A usage limit hit mid-run cost about $3.
 
 ## Open items
 - Claim draft generator (script builds schema-correct claims with line citations from the tables).
